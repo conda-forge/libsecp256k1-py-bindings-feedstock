@@ -4,6 +4,12 @@ context:
   name: libsecp256k1-py-bindings
   version: "0.8.0.1"
 
+  qemu_arch: ${{ target_platform | replace("linux-64", "x86_64") | replace("linux-", "") }}
+  qemu_pkg: ${{ "qemu-execve-" ~ qemu_arch ~ '[version=">=11", build_number=">=10"]' if linux and build_platform != target_platform else "" }}
+  sysroot: ${{ "/" ~ target_triplet ~ "/sysroot" if linux else "" }}
+  is_checkable: ${{ build_platform == target_platform or build_platform in ["linux-64", "osx-arm64"] }}
+  is_qemuable: ${{ linux and build_platform != target_platform }}
+
 package:
   name: ${{ name }}
   version: ${{ version }}
@@ -38,16 +44,31 @@ requirements:
     - python
 
 tests:
-  - python:
-      imports:
-        - libsecp256k1_py_bindings
-      pip_check: true
+  - if: is_checkable
+    then:
+      python:
+        imports:
+          - libsecp256k1_py_bindings
+        pip_check: true
+
   - script:
+      - if: is_qemuable
+        then:
+          - export QEMU_EXECVE="${QEMU_EXECVE:-$(command -v qemu-execve-${{ qemu_arch }} || true)}"
+          - export QEMU_LD_PREFIX="${PREFIX}${{ sysroot }}"
+          - export QEMU_EXECVE_NATIVE_PASSTHROUGH=1
       - pytest -v tests
     requirements:
+      build:
+        - if: is_qemuable
+          then:
+            - ${{ qemu_pkg }}
       run:
         - pytest
         - pytest-benchmark <5.3
+        - if: is_qemuable
+          then:
+            - sysroot_${{ target_platform }}
     files:
       source:
         - tests/
