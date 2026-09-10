@@ -1,0 +1,94 @@
+schema_version: 1
+
+context:
+  name: libsecp256k1-py-bindings
+  version: "0.8.0.1"
+
+  qemu_arch: ${{ target_platform | replace("linux-64", "x86_64") | replace("linux-", "") }}
+  qemu_pkg: ${{ "qemu-execve-" ~ qemu_arch ~ '[version=">=11", build_number=">=10"]' if linux and build_platform != target_platform else "" }}
+  sysroot: ${{ "/" ~ target_platform | replace("linux", "") | replace("-64", "x86_64") | replace("-ppc64le", "powerpc64le") | replace("-", "") ~ "-conda-linux-gnu/sysroot" if linux else "" }}
+  is_checkable: ${{ build_platform == target_platform or build_platform in ["linux-64", "osx-arm64"] }}
+  is_qemuable: ${{ linux and build_platform != target_platform }}
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  url: https://github.com/MementoRC/libsecp256k1-py-bindings/archive/refs/tags/v${{ version }}.tar.gz
+  sha256: 02623c9d7095c96c943d43e66c9442b6114716462f190d9d80257f42756b090d
+
+build:
+  number: 1
+  script: ${{ PYTHON }} -m pip install . --no-build-isolation --use-pep517 -vvv
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ stdlib('c') }}
+    - pkg-config
+    - if: build_platform != target_platform
+      then:
+        - python
+        - cross-python_${{ target_platform }}
+        - cffi >=1.3.0
+  host:
+    - cffi >=1.3.0
+    - libsecp256k1 >=0.8.0,<0.9
+    - pip
+    - python
+    - setuptools >=61
+  run:
+    - asn1crypto
+    - ${{ pin_compatible('cffi') }}
+    - python
+
+tests:
+  - if: is_checkable
+    then:
+      python:
+        imports:
+          - libsecp256k1_py_bindings
+        pip_check: true
+
+  - script:
+      - if: is_qemuable
+        then:
+          - export QEMU_EXECVE="${QEMU_EXECVE:-$(command -v qemu-execve-${{ qemu_arch }} || true)}"
+          - export QEMU_LD_PREFIX="${PREFIX}${{ sysroot }}"
+          - export QEMU_EXECVE_NATIVE_PASSTHROUGH=1
+          - $QEMU_EXECVE $PREFIX/bin/python -m pytest -v tests
+        else:
+          - pytest -v tests
+    requirements:
+      build:
+        - if: is_qemuable
+          then:
+            - ${{ qemu_pkg }}
+      run:
+        - pytest
+        - pytest-benchmark <5.3
+        - if: is_qemuable
+          then:
+            - sysroot_${{ target_platform }}
+    files:
+      source:
+        - tests/
+
+about:
+  homepage: https://github.com/MementoRC/${{ name }}
+  summary: Cross-platform Python CFFI bindings for libsecp256k1 (CFFI from Coincurve)
+  documentation: https://ofek.dev/coincurve/
+  description: |
+    This library provides well-tested Python bindings for libsecp256k1,
+    the heavily optimized C library used by Bitcoin Core for operations
+    on the elliptic curve secp256k1. It is a streamlined version of Coincurve
+  license: MIT OR Apache-2.0
+  license_file:
+    - LICENSE-MIT
+    - LICENSE-APACHE
+
+extra:
+  recipe-maintainers:
+    - ofek
+    - MementoRC
