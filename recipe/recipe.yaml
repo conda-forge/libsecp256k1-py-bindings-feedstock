@@ -57,7 +57,7 @@ tests:
           - export QEMU_EXECVE="${QEMU_EXECVE:-$(command -v qemu-execve-${{ qemu_arch }} || true)}"
           - export QEMU_LD_PREFIX="${PREFIX}${{ sysroot }}"
           - export QEMU_EXECVE_NATIVE_PASSTHROUGH=1
-      - pytest -v tests
+      - python -m pytest -v tests
     requirements:
       build:
         - if: is_qemuable
