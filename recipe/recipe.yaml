@@ -6,7 +6,7 @@ context:
 
   qemu_arch: ${{ target_platform | replace("linux-64", "x86_64") | replace("linux-", "") }}
   qemu_pkg: ${{ "qemu-execve-" ~ qemu_arch ~ '[version=">=11", build_number=">=10"]' if linux and build_platform != target_platform else "" }}
-  sysroot: ${{ "/" ~ target_triplet ~ "/sysroot" if linux else "" }}
+  sysroot: ${{ "/" ~ target_platform | replace("linux", "") | replace("-64", "x86_64") | replace("-ppc64le", "powerpc64le") | replace("-", "") ~ "-conda-linux-gnu/sysroot" if linux else "" }}
   is_checkable: ${{ build_platform == target_platform or build_platform in ["linux-64", "osx-arm64"] }}
   is_qemuable: ${{ linux and build_platform != target_platform }}
 
